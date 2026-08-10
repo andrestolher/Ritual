@@ -17,6 +17,7 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
 app.use(express.json());
+app.use((req, res, next) => { if (req.path.startsWith("/api/") || req.path.startsWith("/auth")) res.set("Cache-Control", "no-store, no-cache, must-revalidate"); next(); });
 app.use(session({ secret: process.env.SESSION_SECRET || "development-secret", resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" } }));
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => { try { done(null, await prisma.user.findUnique({ where: { id } })); } catch (error) { done(error); } });
