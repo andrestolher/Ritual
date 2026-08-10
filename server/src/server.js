@@ -37,8 +37,9 @@ app.use("/api/stats", statsRoutes);
 
 if (process.env.NODE_ENV === "production") {
   const distPath = path.resolve(__dirname, "..", "..", "dist");
-  app.use(express.static(distPath));
-  app.get("*", (_req, res) => { res.sendFile(path.join(distPath, "index.html")); });
+  app.get("/sw.js", (_req, res) => { res.set("Cache-Control", "no-store, no-cache, must-revalidate"); res.sendFile(path.join(distPath, "sw.js")); });
+  app.use(express.static(distPath, { setHeaders: (res, filePath) => { if (filePath.endsWith("index.html") || filePath.endsWith("manifest.json")) res.set("Cache-Control", "no-store, no-cache, must-revalidate"); } }));
+  app.get("*", (_req, res) => { res.set("Cache-Control", "no-store, no-cache, must-revalidate"); res.sendFile(path.join(distPath, "index.html")); });
 }
 
 app.use((error, _req, res, _next) => { console.error(error); const status = error.statusCode || (error.message?.includes("cadena") || error.message?.includes("seleccionado") ? 400 : 500); res.status(status).json({ error: error.message || "Error interno" }); });
