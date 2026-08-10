@@ -10,9 +10,20 @@ import { HabitDetail } from "./components/HabitDetail";
 const today = () => new Date().toISOString().slice(0, 10);
 export default function App() {
   const [user, setUser] = useState(undefined); const [habits, setHabits] = useState([]); const [quote, setQuote] = useState(null); const [selected, setSelected] = useState(null); const [error, setError] = useState(""); const [deleting, setDeleting] = useState(null);
-  async function load() { try { const me = await api("/auth/me"); setUser(me.user); if (me.user) { const [list, dailyQuote] = await Promise.all([api("/api/habits"), api("/api/quote-of-day")]); setHabits(list); setQuote(dailyQuote); } } catch (err) { setError(err.message); setUser(null); } }
-  useEffect(() => { load(); }, []);
-  useEffect(() => { function refresh() { if (document.visibilityState === "visible") load(); } document.addEventListener("visibilitychange", refresh); return () => document.removeEventListener("visibilitychange", refresh); }, []);
+  async function load() {
+    try {
+      const me = await api("/auth/me");
+      setUser(me.user);
+      if (me.user) {
+        const [list, dailyQuote] = await Promise.all([api("/api/habits"), api("/api/quote-of-day")]);
+        setHabits(list); setQuote(dailyQuote); setError("");
+      }
+    } catch (err) {
+      if (!user) { setError(err.message); setUser(null); }
+    }
+  }
+  useEffect(() => { (async () => { for (let i = 0; i < 3 && !user; i++) { await load(); if (!user) await new Promise((r) => setTimeout(r, 600)); } })(); }, []);
+  useEffect(() => { let active = true; function refresh() { if (document.visibilityState === "visible" && active) load(); } document.addEventListener("visibilitychange", refresh); return () => { active = false; document.removeEventListener("visibilitychange", refresh); }; }, [user]);
   async function createHabit(data) { const habit = await api("/api/habits", { method: "POST", body: data }); setHabits((current) => [...current, { ...habit, todayLog: null }]); }
   async function toggle(habit) { const completed = !habit.todayLog?.completed; const log = await api(`/api/habits/${habit.id}/log`, { method: "POST", body: { date: today(), completed } }); setHabits((current) => current.map((item) => item.id === habit.id ? { ...item, todayLog: log } : item)); }
   async function removeHabit() { if (!deleting) return; await api(`/api/habits/${deleting.id}`, { method: "DELETE" }); setHabits((current) => current.filter((item) => item.id !== deleting.id)); setDeleting(null); }
