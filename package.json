@@ -1,0 +1,12 @@
+{
+  "name": "habits",
+  "private": true,
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
+    "build": "npm run build --workspace=client",
+    "db:migrate": "npm run prisma:migrate --workspace=server",
+    "db:generate": "npm run prisma:generate --workspace=server"
+  },
+  "devDependencies": { "concurrently": "^9.1.2" }
+}

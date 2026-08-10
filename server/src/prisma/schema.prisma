@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String
+  habits    Habit[]
+  createdAt DateTime @default(now())
+}
+
+model Habit {
+  id                String     @id @default(uuid())
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  type              HabitType
+  identityStatement String?
+  stackedAfterId    String?
+  stackedAfter      Habit?     @relation("HabitStack", fields: [stackedAfterId], references: [id], onDelete: SetNull)
+  stackedBefore     Habit[]    @relation("HabitStack")
+  logs              HabitLog[]
+  createdAt         DateTime   @default(now())
+
+  @@index([userId])
+}
+
+enum HabitType {
+  BUILD
+  AVOID
+}
+
+model HabitLog {
+  id        String   @id @default(uuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  completed Boolean
+  notes     String?
+
+  @@unique([habitId, date])
+}
