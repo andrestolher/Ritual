@@ -23,10 +23,18 @@ async function validateStack(stackId, userId, habitId) {
 export async function listHabits(req, res, next) {
   try {
     const today = startOfToday();
+    const todayKey = dateKey(today);
     const habits = await prisma.habit.findMany({
       where: { userId: req.user.id }, include: { ...habitInclude, logs: { where: { date: today } } }, orderBy: { createdAt: "asc" }
     });
-    res.json(habits.map(({ logs, ...habit }) => ({ ...habit, todayLog: logs[0] || null })));
+    const habitIds = habits.map((h) => h.id);
+    const missed = await prisma.habitLog.groupBy({ by: ["habitId"], where: { habitId: { in: habitIds }, completed: false } });
+    const missedIds = new Set(missed.map((row) => row.habitId));
+    res.json(habits.map(({ logs, ...habit }) => ({
+      ...habit,
+      todayLog: logs[0] || null,
+      canDelete: dateKey(habit.createdAt) === todayKey || missedIds.has(habit.id)
+    })));
   } catch (error) { next(error); }
 }
 
