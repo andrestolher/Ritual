@@ -6,7 +6,7 @@ export function dateKey(value) {
 
 export function startOfToday() {
   const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 export function calculateStats(logs) {

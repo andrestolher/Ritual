@@ -6,6 +6,12 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 
 const key = (date) => date.toISOString().slice(0, 10);
+function daysAgo(amount) {
+  const now = new Date();
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  date.setUTCDate(date.getUTCDate() - amount);
+  return date;
+}
 const valueOf = (date, map) => map.get(key(date)) ?? null;
 export function HabitDetail({ habit, onBack }) {
   const [stats, setStats] = useState(null);
@@ -13,9 +19,9 @@ export function HabitDetail({ habit, onBack }) {
   if (!stats) return <div className="p-8 text-center text-ink/55">Cargando progreso...</div>;
   const completedMap = new Map(stats.logs.map((log) => [log.date, log.completed]));
   const valueMap = new Map(stats.logs.map((log) => [log.date, log.value]));
-  const days = Array.from({ length: 84 }, (_, index) => { const d = new Date(); d.setDate(d.getDate() - (83 - index)); return { date: key(d), completed: completedMap.get(key(d)) }; });
-  const chart = Array.from({ length: 30 }, (_, index) => { const d = new Date(); d.setDate(d.getDate() - (29 - index)); return { day: `${d.getDate()}/${d.getMonth() + 1}`, completed: completedMap.get(key(d)) ? 100 : 0 }; });
-  const values = Array.from({ length: 30 }, (_, index) => { const d = new Date(); d.setDate(d.getDate() - (29 - index)); return { day: `${d.getDate()}/${d.getMonth() + 1}`, value: valueOf(d, valueMap) }; });
+  const days = Array.from({ length: 84 }, (_, index) => { const d = daysAgo(83 - index); return { date: key(d), completed: completedMap.get(key(d)) }; });
+  const chart = Array.from({ length: 30 }, (_, index) => { const d = daysAgo(29 - index); return { day: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`, completed: completedMap.get(key(d)) ? 100 : 0 }; });
+  const values = Array.from({ length: 30 }, (_, index) => { const d = daysAgo(29 - index); return { day: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`, value: valueOf(d, valueMap) }; });
   const measurable = Boolean(habit.unit || stats.goal != null);
   const metrics = [{ icon: <Flame />, value: stats.currentStreak, label: "racha actual" }, { icon: <Trophy />, value: stats.longestStreak, label: "mejor racha" }, { icon: <span className="text-xl font-bold">%</span>, value: stats.completionRate30d, label: "cumplimiento, 30 días" }];
   if (measurable) metrics.push({ icon: <Ruler size={20} />, value: `${stats.total} ${habit.unit || ""}`.trim(), label: "total, 30 días" }, { icon: <span className="text-xl font-bold">x̄</span>, value: `${stats.avg} ${habit.unit || ""}`.trim(), label: "promedio, 30 días" });
