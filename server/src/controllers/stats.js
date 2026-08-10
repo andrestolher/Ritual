@@ -33,3 +33,19 @@ export function calculateStats(logs) {
     : 0;
   return { currentStreak, longestStreak, completionRate30d };
 }
+
+export function valueStats(logs) {
+  const thirtyDaysAgo = new Date(startOfToday().getTime() - 29 * DAY);
+  const recent = logs
+    .filter((log) => log.value !== null && log.value !== undefined && new Date(log.date) >= thirtyDaysAgo)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (!recent.length) return { total: 0, avg: 0, max: 0, min: 0, lastValue: null };
+  const values = recent.map((log) => log.value);
+  return {
+    total: Math.round(values.reduce((sum, value) => sum + value, 0) * 1000) / 1000,
+    avg: Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) / 100,
+    max: Math.round(Math.max(...values) * 1000) / 1000,
+    min: Math.round(Math.min(...values) * 1000) / 1000,
+    lastValue: recent[recent.length - 1].value
+  };
+}

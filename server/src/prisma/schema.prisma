@@ -23,6 +23,8 @@ model Habit {
   name              String
   type              HabitType
   identityStatement String?
+  unit              String?
+  goal              Float?
   stackedAfterId    String?
   stackedAfter      Habit?     @relation("HabitStack", fields: [stackedAfterId], references: [id], onDelete: SetNull)
   stackedBefore     Habit[]    @relation("HabitStack")
@@ -43,6 +45,7 @@ model HabitLog {
   habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
   date      DateTime @db.Date
   completed Boolean
+  value     Float?
   notes     String?
 
   @@unique([habitId, date])

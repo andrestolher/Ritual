@@ -1,8 +1,42 @@
 import prisma from "../prisma/client.js";
-import { calculateStats, dateKey, startOfToday } from "./stats.js";
+import { calculateStats, dateKey, startOfToday, valueStats } from "./stats.js";
 
 const habitInclude = { stackedAfter: { select: { id: true, name: true } } };
-const fields = ["name", "type", "identityStatement", "stackedAfterId"];
+const fields = ["name", "type", "identityStatement", "stackedAfterId", "unit", "goal"];
+
+function parseValue(value, required) {
+  if (value === undefined || value === null || value === "") {
+    if (required) {
+      const error = new Error("El valor es obligatorio para este hábito");
+      error.statusCode = 400;
+      throw error;
+    }
+    return undefined;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    const error = new Error("El valor debe ser un número no negativo");
+    error.statusCode = 400;
+    throw error;
+  }
+  return Math.round(number * 1000) / 1000;
+}
+
+function parseGoal(goal, unit) {
+  if (goal === undefined || goal === null || goal === "") return null;
+  if (!unit) {
+    const error = new Error("Una meta requiere definir la unidad de medida");
+    error.statusCode = 400;
+    throw error;
+  }
+  const number = Number(goal);
+  if (!Number.isFinite(number) || number < 0) {
+    const error = new Error("La meta debe ser un número no negativo");
+    error.statusCode = 400;
+    throw error;
+  }
+  return Math.round(number * 1000) / 1000;
+}
 
 async function ownedHabit(id, userId) {
   return prisma.habit.findFirst({ where: { id, userId } });
@@ -40,10 +74,12 @@ export async function listHabits(req, res, next) {
 
 export async function createHabit(req, res, next) {
   try {
-    const { name, type, identityStatement, stackedAfterId } = req.body;
+    const { name, type, identityStatement, stackedAfterId, unit, goal } = req.body;
     if (!name?.trim() || !["BUILD", "AVOID"].includes(type)) return res.status(400).json({ error: "Nombre y tipo válidos son obligatorios" });
+    const parsedGoal = parseGoal(goal, unit);
+    if (unit !== undefined && unit !== null && String(unit).trim() === "") return res.status(400).json({ error: "La unidad de medida no puede estar vacía" });
     await validateStack(stackedAfterId, req.user.id);
-    const habit = await prisma.habit.create({ data: { userId: req.user.id, name: name.trim(), type, identityStatement: identityStatement?.trim() || null, stackedAfterId: stackedAfterId || null }, include: habitInclude });
+    const habit = await prisma.habit.create({ data: { userId: req.user.id, name: name.trim(), type, identityStatement: identityStatement?.trim() || null, unit: unit?.trim() || null, goal: parsedGoal, stackedAfterId: stackedAfterId || null }, include: habitInclude });
     res.status(201).json(habit);
   } catch (error) { next(error); }
 }
@@ -55,6 +91,9 @@ export async function updateHabit(req, res, next) {
     const data = Object.fromEntries(fields.filter((key) => key in req.body).map((key) => [key, req.body[key]]));
     if (data.name !== undefined && !data.name?.trim()) return res.status(400).json({ error: "El nombre no puede estar vacío" });
     if (data.type && !["BUILD", "AVOID"].includes(data.type)) return res.status(400).json({ error: "Tipo inválido" });
+    const finalUnit = data.unit !== undefined ? (data.unit?.trim() || null) : existing.unit;
+    if ("goal" in data) data.goal = parseGoal(data.goal, finalUnit);
+    if ("unit" in data && data.unit !== undefined) data.unit = finalUnit;
     if (data.stackedAfterId !== undefined) await validateStack(data.stackedAfterId, req.user.id, existing.id);
     if (data.name) data.name = data.name.trim();
     if (data.identityStatement !== undefined) data.identityStatement = data.identityStatement?.trim() || null;
@@ -77,9 +116,18 @@ export async function logHabit(req, res, next) {
     const habit = await ownedHabit(req.params.id, req.user.id);
     if (!habit) return res.status(404).json({ error: "Hábito no encontrado" });
     const { date, completed, notes } = req.body;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "") || typeof completed !== "boolean") return res.status(400).json({ error: "Fecha y estado de cumplimiento válidos son obligatorios" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return res.status(400).json({ error: "Fecha válida es obligatoria" });
+    const hasMeasurement = Boolean(habit.unit) || habit.goal != null;
+    let value = parseValue(req.body.value, hasMeasurement);
+    let finalCompleted = completed;
+    if (habit.goal != null && value !== undefined) {
+      finalCompleted = habit.type === "AVOID" ? value <= habit.goal : value >= habit.goal;
+    } else if (typeof finalCompleted !== "boolean") {
+      if (habit.goal != null) return res.status(400).json({ error: "El valor es obligatorio cuando el hábito tiene meta" });
+      return res.status(400).json({ error: "Estado de cumplimiento válido es obligatorio" });
+    }
     const logDate = new Date(`${date}T00:00:00.000Z`);
-    res.json(await prisma.habitLog.upsert({ where: { habitId_date: { habitId: habit.id, date: logDate } }, update: { completed, notes: notes?.trim() || null }, create: { habitId: habit.id, date: logDate, completed, notes: notes?.trim() || null } }));
+    res.json(await prisma.habitLog.upsert({ where: { habitId_date: { habitId: habit.id, date: logDate } }, update: { completed: finalCompleted, value, notes: notes?.trim() || null }, create: { habitId: habit.id, date: logDate, completed: finalCompleted, value, notes: notes?.trim() || null } }));
   } catch (error) { next(error); }
 }
 
@@ -87,6 +135,6 @@ export async function habitStats(req, res, next) {
   try {
     const habit = await prisma.habit.findFirst({ where: { id: req.params.id, userId: req.user.id }, include: { logs: true } });
     if (!habit) return res.status(404).json({ error: "Hábito no encontrado" });
-    res.json({ ...calculateStats(habit.logs), logs: habit.logs.map((log) => ({ ...log, date: dateKey(log.date) })) });
+    res.json({ ...calculateStats(habit.logs), ...valueStats(habit.logs), unit: habit.unit, goal: habit.goal, logs: habit.logs.map((log) => ({ ...log, date: dateKey(log.date) })) });
   } catch (error) { next(error); }
 }

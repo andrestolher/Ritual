@@ -10,6 +10,7 @@ import prisma from "./prisma/client.js";
 import authRoutes from "./routes/auth.routes.js";
 import habitRoutes from "./routes/habits.routes.js";
 import quoteRoutes from "./routes/quotes.routes.js";
+import statsRoutes from "./routes/stats.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,7 @@ app.use(passport.session());
 app.use("/auth", authRoutes);
 app.use("/api/habits", habitRoutes);
 app.use("/api", quoteRoutes);
+app.use("/api/stats", statsRoutes);
 
 if (process.env.NODE_ENV === "production") {
   const distPath = path.resolve(__dirname, "..", "..", "dist");
@@ -39,5 +41,5 @@ if (process.env.NODE_ENV === "production") {
   app.get("*", (_req, res) => { res.sendFile(path.join(distPath, "index.html")); });
 }
 
-app.use((error, _req, res, _next) => { console.error(error); res.status(error.message?.includes("cadena") || error.message?.includes("seleccionado") ? 400 : 500).json({ error: error.message || "Error interno" }); });
+app.use((error, _req, res, _next) => { console.error(error); const status = error.statusCode || (error.message?.includes("cadena") || error.message?.includes("seleccionado") ? 400 : 500); res.status(status).json({ error: error.message || "Error interno" }); });
 app.listen(process.env.PORT || 4000, () => console.log(`API ready on port ${process.env.PORT || 4000}`));
