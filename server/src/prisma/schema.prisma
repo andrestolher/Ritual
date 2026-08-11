@@ -8,12 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  googleId  String   @unique
-  email     String   @unique
-  name      String
-  habits    Habit[]
-  createdAt DateTime @default(now())
+  id                    String    @id @default(uuid())
+  googleId              String?   @unique
+  email                 String    @unique
+  name                  String
+  passwordHash          String?
+  emailVerified         Boolean   @default(false)
+  verificationTokenHash String?   @unique
+  verificationExpiresAt DateTime?
+  resetTokenHash        String?   @unique
+  resetExpiresAt        DateTime?
+  habits                Habit[]
+  createdAt             DateTime  @default(now())
 }
 
 model Habit {

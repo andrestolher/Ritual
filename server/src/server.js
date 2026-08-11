@@ -4,6 +4,8 @@ import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import prisma from "./prisma/client.js";
@@ -14,18 +16,29 @@ import statsRoutes from "./routes/stats.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const pgPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const PgSession = connectPgSimple(session);
 app.set("trust proxy", 1);
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
 app.use(express.json());
 app.use((req, res, next) => { if (req.path.startsWith("/api/") || req.path.startsWith("/auth")) res.set("Cache-Control", "no-store, no-cache, must-revalidate"); next(); });
-app.use(session({ secret: process.env.SESSION_SECRET || "development-secret", resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" } }));
+app.use(session({ secret: process.env.SESSION_SECRET || "development-secret", resave: false, saveUninitialized: false, store: new PgSession({ pool: pgPool, tableName: "Session", createTableIfMissing: true }), cookie: { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 1000 * 60 * 60 * 24 * 30 } }));
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => { try { done(null, await prisma.user.findUnique({ where: { id } })); } catch (error) { done(error); } });
 passport.use(new GoogleStrategy({ clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, callbackURL: process.env.GOOGLE_CALLBACK_URL }, async (_accessToken, _refreshToken, profile, done) => {
   try {
     const email = profile.emails?.[0]?.value;
     if (!email) return done(new Error("Google no proporcionó un correo electrónico"));
-    const user = await prisma.user.upsert({ where: { googleId: profile.id }, update: { email, name: profile.displayName || email }, create: { googleId: profile.id, email, name: profile.displayName || email } });
+    if (profile._json?.email_verified === false) return done(new Error("Google no verificó este correo electrónico"));
+    let user = await prisma.user.findUnique({ where: { googleId: profile.id } });
+    if (!user) {
+      const byEmail = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      user = byEmail
+        ? await prisma.user.update({ where: { id: byEmail.id }, data: { googleId: profile.id, emailVerified: true, name: byEmail.name || profile.displayName || email } })
+        : await prisma.user.create({ data: { googleId: profile.id, email: email.toLowerCase(), name: profile.displayName || email, emailVerified: true } });
+    } else if (user.email !== email.toLowerCase()) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { email: email.toLowerCase(), emailVerified: true, name: profile.displayName || user.name } });
+    }
     done(null, user);
   } catch (error) { done(error); }
 }));
