@@ -1,5 +1,5 @@
 {
-  "name": "habits-server",
+  "name": "ritual-server",
   "private": true,
   "type": "module",
   "scripts": {
