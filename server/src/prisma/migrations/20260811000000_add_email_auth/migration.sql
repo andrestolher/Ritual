@@ -5,6 +5,4 @@ ALTER TABLE "User" ADD COLUMN "verificationTokenHash" TEXT;
 ALTER TABLE "User" ADD COLUMN "verificationExpiresAt" TIMESTAMP(3);
 ALTER TABLE "User" ADD COLUMN "resetTokenHash" TEXT;
 ALTER TABLE "User" ADD COLUMN "resetExpiresAt" TIMESTAMP(3);
-CREATE UNIQUE INDEX "User_verificationTokenHash_key" ON "User"("verificationTokenHash");
-CREATE UNIQUE INDEX "User_resetTokenHash_key" ON "User"("resetTokenHash");
 UPDATE "User" SET "emailVerified" = true WHERE "googleId" IS NOT NULL;

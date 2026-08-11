@@ -14,9 +14,9 @@ model User {
   name                  String
   passwordHash          String?
   emailVerified         Boolean   @default(false)
-  verificationTokenHash String?   @unique
+  verificationTokenHash String?
   verificationExpiresAt DateTime?
-  resetTokenHash        String?   @unique
+  resetTokenHash        String?
   resetExpiresAt        DateTime?
   habits                Habit[]
   createdAt             DateTime  @default(now())
