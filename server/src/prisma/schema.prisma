@@ -22,6 +22,14 @@ model User {
   createdAt             DateTime  @default(now())
 }
 
+model Session {
+  sid    String   @id @db.VarChar(255)
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire])
+}
+
 model Habit {
   id                String     @id @default(uuid())
   userId            String
