@@ -19,8 +19,7 @@ router.post("/register", async (req, res, next) => {
     if (!/^\S+@\S+\.\S+$/.test(email) || !name) throw validationError("Nombre y correo válidos son obligatorios");
     if (password.length < 8) throw validationError("La contraseña debe tener al menos 8 caracteres");
     const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing?.googleId && !existing.passwordHash) throw validationError("Esta cuenta ya usa Google. Entra con Google para vincularla.");
-    if (existing?.emailVerified) throw validationError("Ya existe una cuenta con este correo");
+    if (existing?.emailVerified && !(existing.googleId && !existing.passwordHash)) throw validationError("Ya existe una cuenta con este correo");
     const token = createToken();
     const data = { name, passwordHash: await bcrypt.hash(password, 12), emailVerified: false, verificationTokenHash: token.hash, verificationExpiresAt: tokenExpiry(24) };
     const user = existing ? await prisma.user.update({ where: { id: existing.id }, data }) : await prisma.user.create({ data: { ...data, email } });
