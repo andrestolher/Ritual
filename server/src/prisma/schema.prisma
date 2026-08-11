@@ -23,11 +23,11 @@ model User {
 }
 
 model Session {
-  sid    String   @id @db.VarChar(255)
+  sid    String   @id(map: "session_pkey") @db.VarChar
   sess   Json
   expire DateTime @db.Timestamp(6)
 
-  @@index([expire])
+  @@index([expire], map: "IDX_session_expire")
 }
 
 model Habit {
